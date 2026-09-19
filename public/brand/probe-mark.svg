@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Probe</title>
+  <desc>Two independent paths meeting in a geometric P: different accounts, one shared state.</desc>
+  <path d="M16 51V24C16 15.716 22.716 9 31 9H34C42.284 9 49 15.716 49 24V25C49 33.284 42.284 40 34 40H29" stroke="#3F6549" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16 32H32C35.866 32 39 28.866 39 25C39 21.134 35.866 18 32 18H29" stroke="#3F6549" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

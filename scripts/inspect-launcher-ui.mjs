@@ -1,0 +1,30 @@
+export default async function inspect(page) {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('http://127.0.0.1:8790');
+  await page.getByRole('button', { name: 'Agents', exact: true }).click();
+  await page.getByText('probe', { exact: true }).first().waitFor();
+  const agentPage = { url: page.url(), text: (await page.locator('main').innerText().catch(() => page.locator('body').innerText())).slice(0, 8000) };
+  await page.screenshot({ path: '.data/acceptance/probe-trueforge-agent.png', fullPage: false });
+  await page.goto('http://127.0.0.1:8790');
+  await page.getByRole('button', { name: /Go and test this app: http:\/\/localhost:3000\/signup probe/ }).click();
+  await page.getByText('Probe result: Completed', { exact: false }).waitFor();
+  const chatUrl = page.url();
+  await page.screenshot({ path: '.data/acceptance/probe-trueforge-chat.png', fullPage: false });
+  const runResponse = await page.request.get('http://127.0.0.1:4310/api/runs');
+  const runs = await runResponse.json();
+  const run = runs.find(run => run.scenario === 'signup-surface' && run.status === 'completed');
+  if (!run) throw new Error('No completed signup surface inspection');
+  await page.goto(`http://127.0.0.1:4310/#run/${run.id}`);
+  await page.getByRole('heading', { name: 'Signup surface checks', exact: true }).waitFor();
+  await page.locator('.actor-snapshot img').waitFor();
+  await page.waitForFunction(() => [...document.querySelectorAll('.actor-snapshot img')].every(image => image.complete && image.naturalWidth > 0));
+  const desktopOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  await page.screenshot({ path: '.data/acceptance/probe-signup-report.png', fullPage: true });
+  await page.reload();
+  await page.getByRole('heading', { name: 'Signup surface checks', exact: true }).waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  await page.screenshot({ path: '.data/acceptance/probe-signup-report-mobile.png', fullPage: false });
+  if (desktopOverflow || mobileOverflow) throw new Error('Report overflows the viewport');
+  return { agentPage, chatUrl, runUrl: `http://127.0.0.1:4310/#run/${run.id}`, desktopOverflow, mobileOverflow, checks: run.checks.length, passed: run.checks.filter(c => c.status === 'passed').length, persistedAfterRefresh: true };
+}
