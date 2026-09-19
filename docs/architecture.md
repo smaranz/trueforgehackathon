@@ -1,5 +1,13 @@
 # Probe architecture
 
+## Local diagnostic and repair workspace
+
+`src/client/Workbench.tsx` is the default dashboard (`/#dashboard`). The existing audit and demo screens remain available. `src/server/workbench/` adds its own SQLite job/memory store, bounded read-only Chromium diagnostics, screenshot-to-DOM pinpoint mapping, evidence-informed TrueForge analysis, scoped feedback, and paced local stress testing. REST polling retains progress over navigation/reload. Operation locks also guard legacy coordinator entrypoints, including MCP-launched runs.
+
+Repair proposals use selected tracked files from `PROBE_SOURCE_ROOT`. Exact-span edits become a reviewable diff. Build verification runs in a detached Git worktree, then source hashes/commit/cleanliness are checked again before atomic application to the connected repository. Model-supplied commands and arbitrary paths are not accepted. Build success and subsequent live-page verification are distinct results.
+
+`src/server/security.ts` centralizes loopback/origin protection, security headers, rate buckets and SSE capacity. The server still binds only to loopback. See [workbench operation](workbench.md) for limits, configuration and verification semantics.
+
 ## Current full-product audit
 
 `src/server/audit/` implements the bounded real-account audit. The original Fieldnotes architecture below remains specific to that historical demo; its two-role fixture and regression constraints do not describe the new profile.

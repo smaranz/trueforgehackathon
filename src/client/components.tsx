@@ -5,7 +5,7 @@ import { artifactUrl, clock, duration, isActive, statusTone } from './lib';
 import type { Connection } from './useRun';
 
 export function Brand({ small = false }: { small?: boolean }) {
-  return <a href="#new" className={`brand ${small ? 'brand-small' : ''}`} aria-label="Probe home">
+  return <a href="#dashboard" className={`brand ${small ? 'brand-small' : ''}`} aria-label="Probe home">
     <img className="brand-mark" src="/brand/probe-mark.svg" width="42" height="42" alt="" />
     <span className="brand-wordmark">Probe</span>
   </a>;

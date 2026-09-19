@@ -1,4 +1,4 @@
-import express, { type RequestHandler } from 'express';
+import express from 'express';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import { createDemoApp, createEnvironment } from '../demo/app.js';
@@ -15,25 +15,30 @@ import { auditInput, cancelAudit, hasActiveAudit, shutdownAudit, startAudit } fr
 import { auditAssignments } from './audit/catalog.js';
 import { AUDIT_MODEL, AUDIT_TARGET } from './audit/policy.js';
 import { mailboxStatus } from './audit/mailbox.js';
+import { isExpensiveApiPath, localOnly, rateLimiter, streamLimiter } from './security.js';
+import { mountWorkbench } from './workbench/routes.js';
+import { activeWorkbenchId, shutdownWorkbench, WorkbenchError } from './workbench/service.js';
+import { recoverJobs } from './workbench/store.js';
 
 const app = express();
 app.disable('x-powered-by');
-const localOnly: RequestHandler = (req, res, next) => {
-  const host = req.get('host') || '';
-  if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host) || !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '')) {
-    res.status(403).json({ error: 'This isolated demo only serves loopback clients.' }); return;
-  }
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-    const allowedOrigins = [origin, `http://localhost:${port}`, 'http://127.0.0.1:5173', 'http://localhost:5173'];
-    const requestOrigin = req.get('origin');
-    if (req.get('sec-fetch-site') === 'cross-site' || (requestOrigin && !allowedOrigins.includes(requestOrigin))) {
-      res.status(403).json({ error: 'Cross-origin writes are not allowed.' }); return;
-    }
-  }
-  res.setHeader('x-content-type-options', 'nosniff');
-  next();
-};
-app.use(localOnly, express.json({ limit: '128kb' }));
+app.set('trust proxy', false);
+app.use(localOnly);
+app.use('/api', rateLimiter(600));
+app.use('/mcp', rateLimiter(600));
+const writeLimit = rateLimiter(40), expensiveLimit = rateLimiter(8);
+app.use('/api', (req, res, next) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? next() : writeLimit(req, res, next));
+app.use('/api', (req, res, next) => {
+  const costly = req.method === 'POST' && isExpensiveApiPath(req.path);
+  if (costly && activeWorkbenchId() && !req.path.toLowerCase().startsWith('/workbench/')) { res.status(409).json({ error: 'A dashboard operation is active. Finish or cancel it first.' }); return; }
+  if (costly) expensiveLimit(req, res, next); else next();
+});
+app.use(express.json({ limit: '128kb' }));
+app.use('/mcp', (req, res, next) => {
+  const tools = ['start_full_audit', 'test_signup_page', 'start_probe_demo', 'start_fresh_signup_check'];
+  if (req.body?.method === 'tools/call' && tools.includes(req.body.params?.name)) expensiveLimit(req, res, next); else next();
+});
+mountWorkbench(app);
 mountMcp(app);
 mountProbeLauncher(app);
 mountAuditMcp(app);
@@ -55,13 +60,13 @@ app.get('/api/runs/:id', (req, res) => {
   if (!run) { res.status(404).json({ error: 'Run not found' }); return; }
   res.json(run);
 });
-app.get('/api/runs/:id/events', (req, res) => {
-  const run = getRun(req.params.id);
+app.get('/api/runs/:id/events', streamLimiter(), (req, res) => {
+  const run = getRun(String(req.params.id));
   if (!run) { res.status(404).json({ error: 'Run not found' }); return; }
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
   res.flushHeaders();
   let pending: NodeJS.Timeout | undefined;
-  const write = () => { pending = undefined; res.write(`event: run\ndata: ${JSON.stringify(getRun(run.id))}\n\n`); };
+  const write = () => { pending = undefined; if (!res.destroyed && res.writableLength < 1024 * 1024) res.write(`event: run\ndata: ${JSON.stringify(getRun(run.id))}\n\n`); };
   const send = () => { if (!pending) pending = setTimeout(write, 250); };
   write();
   updates.on(run.id, send);
@@ -90,7 +95,7 @@ app.use('/artifacts', express.static(artifactDir, {
   dotfiles: 'deny', index: false,
   setHeaders: (res, path) => {
     res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.setHeader('Cache-Control', 'private, no-store');
     if (!path.endsWith('.png')) res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   },
 }));
@@ -100,7 +105,9 @@ if (existsSync(`${root}dist/index.html`)) {
 } else app.get('/', (_req, res) => { res.type('text').send('Probe API is running. Use http://127.0.0.1:5173 with npm run dev, or npm run build for the bundled UI.'); });
 app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (res.headersSent) { next(error); return; }
-  res.status(error instanceof z.ZodError ? 400 : 409).json({ error: safeError(error) });
+  const parserStatus = (error as { status?: number })?.status;
+  const status = error instanceof z.ZodError ? 400 : error instanceof WorkbenchError ? error.status : parserStatus === 413 ? 413 : parserStatus === 400 ? 400 : 500;
+  res.status(status).json({ error: error instanceof z.ZodError ? error.issues.map(issue => `${issue.path.join('.') || 'input'}: ${issue.message}`).join('; ') : safeError(error) });
 });
 const demo = express();
 // Separate origin, loopback listener, and no remotely accessible reset/fault controls.
@@ -116,6 +123,7 @@ const apiServer = app.listen(port, '127.0.0.1', () => {
 });
 const demoServer = demo.listen(demoPort, '127.0.0.1', () => console.log(`Fieldnotes demo → ${demoOrigin}`));
 void cancelRecoveredSessions(recoverInterruptedRuns().filter(id => !id.startsWith('browser-')));
+recoverJobs();
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, async () => {
-  await Promise.all([shutdown(), shutdownSignup(), shutdownAudit()]); apiServer.close(); demoServer.close(); process.exit(0);
+  await Promise.all([shutdown(), shutdownSignup(), shutdownAudit(), shutdownWorkbench()]); apiServer.close(); demoServer.close(); process.exit(0);
 });

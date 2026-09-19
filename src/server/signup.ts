@@ -2,6 +2,7 @@ import { chromium, expect, type Browser } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { artifact, event, getRun, saveRun } from './store.js';
 import { hasActiveRuns } from './coordinator.js';
+import { activeWorkbenchId } from './workbench/service.js';
 import { safeError } from './browser.js';
 import type { Run, SurfaceCheck } from '../shared/types.js';
 
@@ -20,7 +21,7 @@ export function allowedSignupRequest(raw: string, method: string): boolean {
 /** Explicitly authorized target, deterministic surface checks; no account creation or login. */
 export function inspectSignup(targetUrl: string, upstreamSignal?: AbortSignal): Promise<Run> {
   if (targetUrl !== signupTarget) throw new Error(`Only the explicitly authorized target ${signupTarget} is supported by this tool.`);
-  if (hasActiveRuns() || hasActiveSignup()) throw new Error('A Probe run is active. Wait for it to finish or cancel it.');
+  if (hasActiveRuns() || hasActiveSignup() || activeWorkbenchId()) throw new Error('A Probe run is active. Wait for it to finish or cancel it.');
   const id = randomUUID();
   const run: Run = { id, name: 'Publick signup · surface check', targetUrl, goal: 'Inspect signup rendering, native form constraints, password visibility and responsive layout without creating an account.',
     scenario: 'signup-surface', mode: 'deterministic', status: 'running', phase: 'preconditions', startedAt: new Date().toISOString(), cost: null,

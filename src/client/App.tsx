@@ -81,6 +81,7 @@ export function App() {
     }}>
       <div className="sidebar-brand-row"><Brand /><button ref={menuButton} type="button" className="icon-button mobile-menu" aria-label={navigationOpen ? 'Close run history' : 'Open run history'} aria-expanded={navigationOpen} aria-controls="sidebar-content" onClick={() => setNavigationOpen(value => !value)}>{navigationOpen ? <X size={22} /> : <List size={22} />}</button></div>
       <div id="sidebar-content" className="sidebar-content">
+        <a href="#dashboard" className="new-run-link"><Flask size={18} /><span>Diagnostics & repairs</span><ArrowUpRight size={16} /></a>
         <a href="#new" className={`new-run-link ${route.page === 'new' ? 'selected' : ''}`} aria-current={route.page === 'new' ? 'page' : undefined} onClick={() => setNavigationOpen(false)}><Plus size={18} /><span>New run</span><ArrowUpRight size={16} /></a>
         <div className="history-heading"><span className="eyebrow">RUN HISTORY</span>{(workspace.runs.length > 0 || (!workspace.runsLoading && !workspace.runsError)) && <span className="history-count mono">{workspace.runs.length}</span>}<button className="icon-button" type="button" aria-label="Refresh run history" disabled={workspace.runsLoading} onClick={() => void workspace.refreshRuns()}><ArrowClockwise size={15} /></button></div>
         <nav className="run-history" aria-label="Run history" aria-busy={workspace.runsLoading}>

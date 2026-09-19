@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { activeWorkbenchId } from './workbench/service.js';
 import assert from 'node:assert/strict';
 import { createEnvironment, getEnvironmentState } from '../demo/app.js';
 import type { Finding, NewRunInput, Phase, Role, Run } from '../shared/types.js';
@@ -14,7 +15,7 @@ export function hasActiveRuns(): boolean { return active.size > 0; }
 
 export function createRun(input: NewRunInput): Run {
   validateTarget(input.targetUrl);
-  if (hasActiveRuns()) throw new Error('A run is already active. Finish or cancel it before starting another.');
+  if (hasActiveRuns() || activeWorkbenchId()) throw new Error('A run is already active. Finish or cancel it before starting another.');
   const id = randomUUID();
   const run: Run = { id, name: 'When access is taken away', goal: input.goal, targetUrl: input.targetUrl,
     mode: input.mode, variant: input.variant, scenario: input.scenario, status: 'queued', phase: 'preconditions', startedAt: new Date().toISOString(),
@@ -205,7 +206,7 @@ export async function cancelRun(id: string): Promise<Run> {
 export function startPreparedFixVerification(id: string): Run {
   const run = getRun(id);
   if (!run) throw new Error('Run not found');
-  if (hasActiveRuns()) throw new Error('Wait for the active run to finish.');
+  if (hasActiveRuns() || activeWorkbenchId()) throw new Error('Wait for the active run to finish.');
   const baseline = run.verifications.find(result => result.variant === 'broken' && result.status === 'failed');
   if (!baseline) throw new Error('A captured failing regression against the broken variant is required first.');
   if (run.verifications.some(result => result.variant === 'corrected' && result.status === 'passed')) throw new Error('Prepared fix already verified; see the preserved comparison.');

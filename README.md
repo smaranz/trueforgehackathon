@@ -2,9 +2,24 @@
 
 **Your first team of users. Before your real users.**
 
+## Local diagnostics & repair dashboard
+
+Open **[http://127.0.0.1:4310/#dashboard](http://127.0.0.1:4310/#dashboard)** after the launch steps below. Probe stays **local-only**: the API, dashboard, and demo bind to loopback.
+
+- **Scan a local page:** collect runtime/server errors, form-label and control-name issues, image text, layout overflow, and contextual security-header suggestions. Each finding includes the exact observation, route/selector, expected behavior, evidence, and a suggested correction.
+- **Pinpoint and investigate:** click the captured page (or use the keyboard), describe a suspected missed issue, and ask the TrueForge agent to inspect fresh evidence for that element. Matching objective observations can be independently confirmed; model inferences stay Suspected.
+- **Propose → Build fix:** connect your app's clean local Git repository with `PROBE_SOURCE_ROOT`. The agent prepares a reviewable source diff. **Build fix** checks the patch in a disposable Git worktree, runs the project's build and tests, and applies passing changes to your original working tree without committing. Dirty/stale source, failed checks, invalid patches, and cancellation prevent application. Rescan after reloading your app to check the live result.
+- **Personal feedback:** explain why a finding is a false positive or a real issue. Scoped lessons persist in local SQLite and inform future investigations/proposals. Original evidence remains visible; lessons can be forgotten. This is agent memory, not model-weight training.
+- **Stress testing:** bounded GET load with request/concurrency/rate controls, p50/p95/max latency, throughput, status counts, failures, and HTTP 429 reporting. Stops at rate-limit/error boundaries and supports cancellation.
+- **Control-plane protection:** per-client API/MCP limits, stricter write/job limits, bounded SSE connections, cross-origin/rebinding protection, and security response headers.
+
+Scans and stress tests do not require a model. Deeper investigations and source proposals require TrueForge with a working configured model. The dashboard's configurable local targets are separate from the existing full-audit profile, which retains its fixed target and account workflow.
+
+See **[dashboard setup and repair workflow](docs/workbench.md)** for configuration, exact limits, supported repairs, and verification commands.
+
 Probe runs a bounded team of **30 GPT-5.6 Sol specialists** against the authorized product at `http://localhost:3000/signup`. Agents create real accounts with synthetic identities, explore assigned workflows in separate browsers, and record functional, accessibility, usability and restricted security evidence. Their observations are not human sentiment or a guarantee of 100% coverage.
 
-## Current release status
+## Historical full-audit release status
 
 - **Release checks:** 32 tests passed, zero failed; production build passed, recorded in `.data/acceptance/full-audit-launch.json`.
 - **Full audit: terminal INCONCLUSIVE.** [Recorded 30-specialist run](http://127.0.0.1:4310/#run/49131e1e-2c31-479d-be5d-33d760536377) ran **19 September 2026, 21:45:54–21:49:11 UTC**. The live API checked at 21:50:27 UTC reports **six verified accounts; three assignments completed, three failed, 24 blocked**. Reported usage: **990,722 input / 12,867 output tokens**. The earlier launch snapshot correctly recorded a running audit; it is superseded by this terminal result.

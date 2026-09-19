@@ -12,6 +12,7 @@
     "test:regression": "playwright test --config playwright.config.ts",
     "verify:demo": "tsx scripts/verify-demo.ts",
     "verify:agent": "tsx scripts/run-agent.ts",
+    "verify:workbench": "tsx scripts/verify-workbench.ts",
     "trueforge": "HOST=127.0.0.1 trueforge --port 8790"
   },
   "engines": {
@@ -24,6 +25,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "@truefoundry/trueforge-sdk": "^0.2.0",
     "dotenv": "^18.0.1",
+    "esbuild": "^0.28.2",
     "express": "^5.2.1",
     "imapflow": "^2.0.5",
     "mailparser": "^3.9.28",

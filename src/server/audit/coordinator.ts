@@ -11,6 +11,7 @@ import { auditAssignments } from './catalog.js';
 import { AUDIT_MODEL, AUDIT_TARGET } from './policy.js';
 import { AuditBrowser, sanitizeAuditText } from './browser.js';
 import { ProviderCooldown, providerRateLimitDelay } from './rate-limit.js';
+import { activeWorkbenchId } from '../workbench/service.js';
 
 export const auditInput = z.object({ targetUrl: z.literal(AUDIT_TARGET), agentCount: z.number().int().min(1).max(30).default(30), concurrency: z.number().int().min(1).max(6).default(4), maxStepsPerAgent: z.number().int().min(15).max(100).default(60), deadlineMinutes: z.number().int().min(5).max(90).default(60), maxTotalTokens: z.number().int().min(100000).max(6000000).default(6000000), goal: z.string().min(5).max(3000).default('Test the full product with real synthetic accounts. Investigate workflows, persistence, projects, broken controls, accessibility, concrete UI confusion and bounded security checks. Report evidence-backed failures and actual coverage.') }).strict();
 interface Active { controller: AbortController; browsers: Set<AuditBrowser>; sessions: Set<string>; done?: Promise<void>; }
@@ -22,7 +23,7 @@ const liveStatus = (agent: AuditAgent) => ['queued', 'signing-up', 'running', 'r
 
 export function startAudit(raw: AuditInput): Run {
   const input = auditInput.parse(raw);
-  if (hasActiveAudit() || hasActiveRuns() || hasActiveSignup()) throw new Error('A Probe run is already active. Finish or cancel it first.');
+  if (hasActiveAudit() || hasActiveRuns() || hasActiveSignup() || activeWorkbenchId()) throw new Error('A Probe run is already active. Finish or cancel it first.');
   const id = randomUUID();
   const run: Run = { id, name: `Full product audit · ${input.agentCount} specialists`, goal: input.goal, targetUrl: input.targetUrl, scenario: 'full-audit', mode: 'trueforge', status: 'queued', phase: 'preconditions', startedAt: new Date().toISOString(), cost: null,
     actors: [], events: [], artifacts: [], findings: [], verifications: [],
