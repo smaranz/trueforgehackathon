@@ -13,7 +13,7 @@ import { AuditBrowser, sanitizeAuditText } from './browser.js';
 import { ProviderCooldown, providerRateLimitDelay } from './rate-limit.js';
 import { activeWorkbenchId } from '../workbench/service.js';
 
-export const auditInput = z.object({ targetUrl: z.literal(AUDIT_TARGET), agentCount: z.number().int().min(1).max(30).default(30), concurrency: z.number().int().min(1).max(6).default(4), maxStepsPerAgent: z.number().int().min(15).max(100).default(60), deadlineMinutes: z.number().int().min(5).max(90).default(60), maxTotalTokens: z.number().int().min(100000).max(6000000).default(6000000), goal: z.string().min(5).max(3000).default('Test the full product with real synthetic accounts. Investigate workflows, persistence, projects, broken controls, accessibility, concrete UI confusion and bounded security checks. Report evidence-backed failures and actual coverage.') }).strict();
+export const auditInput = z.object({ targetUrl: z.literal(AUDIT_TARGET), agentCount: z.number().int().min(1).max(30).default(30), concurrency: z.number().int().min(1).max(6).default(4), maxStepsPerAgent: z.number().int().min(15).max(100).default(60), deadlineMinutes: z.number().int().min(5).max(90).default(60), maxTotalTokens: z.number().int().nonnegative().nullable().optional().describe('Deprecated compatibility field. Ignored: Probe no longer applies a total-token budget.'), goal: z.string().min(5).max(3000).default('Test the full product with real synthetic accounts. Investigate workflows, persistence, projects, broken controls, accessibility, concrete UI confusion and bounded security checks. Report evidence-backed failures and actual coverage.') }).strict();
 interface Active { controller: AbortController; browsers: Set<AuditBrowser>; sessions: Set<string>; done?: Promise<void>; }
 const active = new Map<string, Active>();
 const providerCooldown = new ProviderCooldown();
@@ -27,8 +27,8 @@ export function startAudit(raw: AuditInput): Run {
   const id = randomUUID();
   const run: Run = { id, name: `Full product audit · ${input.agentCount} specialists`, goal: input.goal, targetUrl: input.targetUrl, scenario: 'full-audit', mode: 'trueforge', status: 'queued', phase: 'preconditions', startedAt: new Date().toISOString(), cost: null,
     actors: [], events: [], artifacts: [], findings: [], verifications: [],
-    limitations: ['Agents test their assigned surfaces within step, time and token budgets; this is not a guarantee of exhaustive coverage or security certification.', 'Real synthetic accounts and test-owned content are created in the target’s configured backend. Account credentials are encrypted locally and never shown to models.', 'Payments, invitations, external OAuth, public posting, account deletion and administrative endpoints are out of scope.', 'UI critiques remain observations unless independently reproduced with objective evidence. At most six objective findings are replayed per audit; other findings remain suspected.', 'Browser state is not resumed after server restart. Artifacts and progress are retained, and interrupted jobs are marked inconclusive.'],
-    audit: { model: AUDIT_MODEL, requestedAgents: input.agentCount, concurrency: Math.min(input.concurrency, input.agentCount), maxStepsPerAgent: input.maxStepsPerAgent, deadlineMinutes: input.deadlineMinutes, maxTotalTokens: input.maxTotalTokens, stage: 'registration', accountCount: 0, reproductions: [], agents: auditAssignments.slice(0, input.agentCount).map(item => ({ ...item, status: 'queued', signup: 'pending', stepCount: 0, productActions: 0, visitedUrls: [], coverage: [] })) } };
+    limitations: ['There is no total-token or spending cutoff. Agents still have browser-step and runtime limits; this is not a guarantee of exhaustive coverage or security certification.', 'Real synthetic accounts and test-owned content are created in the target’s configured backend. Account credentials are encrypted locally and never shown to models.', 'Payments, invitations, external OAuth, public posting, account deletion and administrative endpoints are out of scope.', 'UI critiques remain observations unless independently reproduced with objective evidence. At most six objective findings are replayed per audit; other findings remain suspected.', 'Browser state is not resumed after server restart. Artifacts and progress are retained, and interrupted jobs are marked inconclusive.'],
+    audit: { model: AUDIT_MODEL, requestedAgents: input.agentCount, concurrency: Math.min(input.concurrency, input.agentCount), maxStepsPerAgent: input.maxStepsPerAgent, deadlineMinutes: input.deadlineMinutes, maxTotalTokens: null, stage: 'registration', accountCount: 0, reproductions: [], agents: auditAssignments.slice(0, input.agentCount).map(item => ({ ...item, status: 'queued', signup: 'pending', stepCount: 0, productActions: 0, visitedUrls: [], coverage: [] })) } };
   saveRun(run);
   const execution: Active = { controller: new AbortController(), browsers: new Set(), sessions: new Set() };
   active.set(id, execution); execution.done = execute(run, execution); return run;
@@ -109,9 +109,8 @@ async function execute(run: Run, execution: Active) {
   let registrationBlocked: string | undefined;
   let registrationQueue = Promise.resolve();
   const originalEvidence = new Map<string, Set<string>>();
-  const withinBudget = () => (run.tokens?.input || 0) + (run.tokens?.output || 0) < audit.maxTotalTokens;
   const runAgent = async (agent: AuditAgent) => {
-    if (registrationBlocked || !withinBudget() || signal.aborted) { agent.status = signal.aborted ? 'cancelled' : registrationBlocked ? 'blocked' : 'budget-exhausted'; agent.error = registrationBlocked || 'Audit budget reached before this assignment started'; saveRun(run); return; }
+    if (registrationBlocked || signal.aborted) { agent.status = signal.aborted ? 'cancelled' : 'blocked'; agent.error = registrationBlocked || 'Audit cancelled before this assignment started'; saveRun(run); return; }
     const browser = new AuditBrowser(run, agent, signal); execution.browsers.add(browser); agent.startedAt = new Date().toISOString();
     let session: string | undefined;
     try {
@@ -123,15 +122,13 @@ async function execute(run: Run, execution: Active) {
       try {
         signal.throwIfAborted();
         if (registrationBlocked) throw new Error(registrationBlocked);
-        if (!withinBudget()) { agent.status = 'budget-exhausted'; agent.error = 'Token budget reached while queued for signup'; return; }
         await turn(run, agent, session, 'PHASE1 — real account setup. Call the signup browser action now. Inspect the resulting authenticated page. Stop after establishing account/session proof. Do not start onboarding yet. If signup cannot establish a real authenticated session, finish_assignment with the blocker and stop.', signal);
         if (agent.signup !== 'verified') { registrationBlocked = agent.error || `Real signup did not establish a session (${agent.signup}). Further account registrations stopped.`; throw new Error(registrationBlocked); }
       } finally { release(); }
-      if (!withinBudget()) { agent.status = 'budget-exhausted'; agent.error = 'Token budget reached after signup'; return; }
       agent.status = 'running'; agent.workPhase = 'testing'; agent.summary = undefined; agent.coverage = []; audit.stage = 'exploration'; run.phase = 'check';
       event(run, 'audit.product-testing.started', `${agent.name}: signup verified; now testing the product itself.`, { actorId: agent.id, sessionId: session });
       await turn(run, agent, session, `PHASE2 — SIGNUP IS FINISHED, THE ASSIGNMENT IS NOT. You must now test the actual product. ${agent.objective} Explore assigned routes ${agent.routes.join(', ')}. Complete required onboarding through its UI when access depends on it; optional onboarding sections can be skipped if the UI provides Skip. Do not stop after arriving at onboarding. Perform concrete actions on the product: create/edit/select/save or interact with the assigned feature, then verify its state. For security/accessibility specialists use appropriate actual product checks. Merely viewing the signup or onboarding page is not completion. Use roughly25 browser actions if needed, keeping steps for a second pass. Report observed failures and blocked prerequisites with evidence.`, signal);
-      if (agent.stepCount < audit.maxStepsPerAgent - 5 && withinBudget()) {
+      if (agent.stepCount < audit.maxStepsPerAgent - 5) {
         agent.workPhase = 'rechecking'; saveRun(run);
         await turn(run, agent, session, `PHASE3 — deepen and verify your actual product work. So far ${agent.productActions || 0} post-signup product interactions have been captured. If zero, you have NOT tested the product yet: complete prerequisites or document the exact blocker; do not declare success. Revisit changed state after navigation/reload; exercise validation, edge/empty states and overlooked assigned routes. Check assumptions using fresh evidence. Use the remaining action budget for meaningful coverage, not repeated inspections of an unchanged page. Finish_assignment with exact tested workflows, observed outcomes and explicit blocked/untested items.`, signal);
       }
@@ -160,7 +157,6 @@ async function execute(run: Run, execution: Active) {
     audit.stage = 'verification'; run.phase = 'reproduce'; saveRun(run);
     const candidates = run.findings.filter(finding => finding.auditAssertion && !['observation', 'visible_text'].includes(finding.auditAssertion.kind)).slice(0, 6);
     for (const finding of candidates) {
-      if (!withinBudget()) break;
       signal.throwIfAborted();
       const agent = audit.agents.find(agent => finding.actorIds?.includes(agent.id));
       if (!agent || agent.signup !== 'verified') continue;
@@ -181,7 +177,7 @@ async function execute(run: Run, execution: Active) {
     audit.stage = 'complete'; run.phase = 'complete';
     run.status = audit.agents.some(agent => ['blocked', 'failed', 'budget-exhausted', 'cancelled'].includes(agent.status)) ? 'inconclusive' : 'completed';
     if (registrationBlocked) run.error = registrationBlocked;
-    else if (run.status === 'inconclusive') run.error = 'Some assignments were blocked, incomplete or budget-limited. Review per-agent coverage; no full-product pass is claimed.';
+    else if (run.status === 'inconclusive') run.error = 'Some assignments were blocked, incomplete or reached their browser-step limit. Review per-agent coverage; no full-product pass is claimed.';
   } catch (error) {
     run.status = signal.aborted ? 'cancelled' : 'inconclusive'; run.error = sanitizeAuditText(safeError(error));
     for (const agent of audit.agents) if (liveStatus(agent)) { agent.status = signal.aborted ? 'cancelled' : 'blocked'; agent.error = run.error; }

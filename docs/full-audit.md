@@ -8,7 +8,7 @@ Up to **30 specialists** investigate `http://localhost:3000/signup` using fixed 
 
 The earlier missing **`@visx/responsive`** dependency on `/essays` was independently reproduced. The target's missing installed dependencies have since been restored, and signup/essays/dashboard now return200. The harness's premature32-iteration cutoff was also corrected. These repairs do not erase historical findings or establish a product-wide pass. See [verification](verification.md).
 
-## Entry points and budgets
+## Entry points and execution limits
 
 - UI: **`/#new/audit`**.
 - **`GET /api/audits/catalog`**: assignments, model, fixed target and mailbox status.
@@ -24,7 +24,6 @@ Example request body:
   "concurrency": 4,
   "maxStepsPerAgent": 60,
   "deadlineMinutes": 60,
-  "maxTotalTokens": 6000000,
   "goal": "Investigate assigned workflows with real synthetic accounts and report evidence, coverage and blockers."
 }
 ```
@@ -35,10 +34,10 @@ Example request body:
 | Concurrency | 4 | 1–6, limited by agent count |
 | Browser steps per specialist | 60 | 15–100 |
 | Deadline | 60 minutes | 5–90 minutes |
-| Reported total tokens | 6,000,000 | 100,000–6,000,000 |
+| Total tokens | Unlimited | Usage recorded; no token/spending cutoff |
 | Target-AI endpoint requests | 6 per agent | Backend-enforced limit |
 
-These are execution ceilings, not guaranteed duration, coverage or spend. Actual timestamps determine elapsed duration; there are no artificial time-filling delays. Rendering, network and confirmation polling take real time. Token metrics arrive after turns, so concurrent/in-flight work can exceed the nominal token budget before another check. Cost is unavailable.
+Browser steps, runtime, concurrency and target-AI calls are execution limits, not cost controls or guaranteed coverage. Actual timestamps determine elapsed duration; there are no artificial time-filling delays. Rendering, network and confirmation polling take real time. Total token usage is recorded but never used to skip agents, suppress their recheck pass or stop reproduction. New runs store `audit.maxTotalTokens: null`; old numeric request values are accepted for compatibility and ignored. Historical runs retain their original recorded limits and outcomes. Cost is unavailable.
 
 One Probe run is active at once. Specialists enter a bounded queue; registrations are serialized so unverifiable signup stops further registrations promptly. Assignment completion is not a product-wide pass.
 

@@ -25,6 +25,17 @@ const hash = (value: string) => createHash('sha256').update(value).digest();
 const accepts = (value: string) => timingSafeEqual(hash(value), hash(launcherToken));
 export let probeIntegration: { configured: boolean; agentId?: string; reason?: string } = { configured: false };
 
+/** Compare effective settings; the API adds empty tool-list defaults on readback. */
+export function matchesArchivedAgentSpec(spec: ReturnType<typeof archivedAgentSpec>, name: string): boolean {
+  const expected = archivedAgentSpec(name);
+  const server = spec.mcpServers?.[0];
+  const tools = server?.enableTools ?? [];
+  return spec.model.name === expected.model.name && spec.instructions === expected.instructions &&
+    spec.mcpServers?.length === 1 && server?.name === name && server.preload === true &&
+    tools.length === 2 && tools.includes('probe_session_status') && tools.includes('start_full_audit') &&
+    !server.disableTools?.length && !server.requireApprovalForTools?.length;
+}
+
 export function mountProbeLauncher(app: Express): void {
   app.post('/mcp/probe', async (req, res) => {
     if (!accepts(req.get('authorization')?.replace(/^Bearer /, '') || '')) { res.status(401).json({ error: 'Invalid Probe launcher credential' }); return; }
@@ -82,7 +93,7 @@ export function mountProbeLauncher(app: Express): void {
 }
 
 /** Repairs only our known ended-run connectors; never reopens their browsers. */
-export async function repairArchivedConnectors(): Promise<string[]> {
+export async function repairArchivedConnectors(onlySessionId?: string): Promise<string[]> {
   const { data: configured } = await forge.settings.mcpServers.list({ timeoutInSeconds: 8 });
   const repaired: string[] = [];
   for (const run of listRuns()) {
@@ -95,11 +106,28 @@ export async function repairArchivedConnectors(): Promise<string[]> {
       if (!environmentId) continue;
     } catch { continue; }
     for (const role of ['owner', 'editor'] as const) {
-      if (!run.events.some(entry => entry.type === 'trueforge.session.created' && entry.actor === role)) continue;
+      const sessionId = run.events.find(entry => entry.type === 'trueforge.session.created' && entry.actor === role)?.sessionId;
+      if (!sessionId || (onlySessionId && sessionId !== onlySessionId)) continue;
+      const { data: session } = await forge.sessions.get(sessionId, { timeoutInSeconds: 8 });
+      if (session.id !== sessionId || session.agent.type !== 'inline' ||
+          session.metadata.probeSourceRunId !== run.id || session.metadata.probeSourceRole !== role) continue;
       for (const prefix of ['cz', 'probe']) {
         const name = `${prefix}-${run.id.slice(0, 8)}-${environmentId.slice(0, 8)}-${role}`;
         const connector = configured.find(item => item.name === name);
         if (!connector || connector.manifest.type !== 'remote' || connector.manifest.url !== `${origin}/mcp`) continue;
+        const spec = session.agent.spec;
+        const servers = spec.mcpServers ?? [];
+        // A foreign connector is a deliberate customization, not the stale UI's empty profile.
+        if (servers.some(server => server.name !== name)) continue;
+        const expected = archivedAgentSpec(name);
+        const genericEmpty = servers.length === 0 && !spec.instructions?.trim();
+        if (servers.length === 0 && !genericEmpty && spec.instructions !== expected.instructions) continue;
+        let running = false;
+        // SDK defaults to oldest-first and may paginate; only the final turn is the latest.
+        for await (const turn of await forge.sessions.listTurns(sessionId, {}, { timeoutInSeconds: 8 })) {
+          running = turn.state.status === 'running';
+        }
+        if (running) continue;
         if (!connectorArchived(name)) {
           const token = randomBytes(32).toString('base64url');
           rememberCapability(token, run.id, role, true);
@@ -109,17 +137,13 @@ export async function repairArchivedConnectors(): Promise<string[]> {
           } }, { timeoutInSeconds: 8 });
           markConnectorArchived(name); repaired.push(name);
         }
-        const sessionId = run.events.find(entry => entry.type === 'trueforge.session.created' && entry.actor === role)?.sessionId;
-        if (!sessionId) continue;
-        const { data: session } = await forge.sessions.get(sessionId, { timeoutInSeconds: 8 });
-        if (session.agent.type !== 'inline' || session.metadata.probeArchiveVersion === archiveVersion || session.agent.spec.mcpServers?.length !== 1 || session.agent.spec.mcpServers[0].name !== name) continue;
-        let running = false;
-        for await (const turn of await forge.sessions.listTurns(sessionId)) { running = turn.state.status === 'running'; break; }
-        if (running) continue;
+        if (session.metadata.probeArchiveVersion === archiveVersion && matchesArchivedAgentSpec(spec, name)) continue;
         await forge.sessions.update(sessionId, {
-          agent: { spec: archivedAgentSpec(name) },
+          agent: { spec: expected },
           metadata: { ...session.metadata, probeArchiveVersion: archiveVersion, probeSourceRunId: run.id, probeSourceRole: role },
         }, { timeoutInSeconds: 8 });
+        if (!repaired.includes(name)) repaired.push(name);
+        break;
       }
     }
   }
@@ -127,7 +151,7 @@ export async function repairArchivedConnectors(): Promise<string[]> {
 }
 
 let connecting: Promise<typeof probeIntegration> | undefined;
-export function connectProbe(): Promise<typeof probeIntegration> {
+export function connectProbe(onlySessionId?: string): Promise<typeof probeIntegration> {
   if (connecting) return connecting;
   connecting = (async () => {
     try {
@@ -138,7 +162,7 @@ export function connectProbe(): Promise<typeof probeIntegration> {
       } }, { timeoutInSeconds: 8 });
       const manifest = {
         model: { name: forgeModel },
-        instructions: `You are Probe, the user's full-product audit launcher. DEFAULT behavior for any “test this app”, “test this URL”, “test signup” or “go test with Probe” request at http://localhost:3000/signup is to call start_full_audit with targetUrl http://localhost:3000/signup and defaults30 agents4concurrent60steps60min6milliontokens. Signup is only the entry point; agents must create accounts, complete prerequisites and test product workflows. Do NOT choose the quick signup form tool just because the URL contains /signup. Earlier smoke-check results in conversation are historical and must not override this default.
+        instructions: `You are Probe, the user's full-product audit launcher. DEFAULT behavior for any “test this app”, “test this URL”, “test signup” or “go test with Probe” request at http://localhost:3000/signup is to call start_full_audit with targetUrl http://localhost:3000/signup and defaults30 agents4concurrent60steps60min. There is NO total-token or spending cutoff; omit maxTotalTokens. Provider rate limits use backoff. Signup is only the entry point; agents must create accounts, complete prerequisites and test product workflows. Do NOT choose the quick signup form tool just because the URL contains /signup. Earlier smoke-check results in conversation are historical and must not override this default.
 After start_full_audit returns, reply immediately using its actual reply field: “Running in Probe dashboard” and the exact runUrl,30Sol agents4at a time. END YOUR TURN. The audit runs in backend workers after your chat response; do not poll or wait for it to finish unless the user separately asks for progress. Do not claim full results at launch. If preflight failed, report the failure instead of saying running. An existing active run should be linked instead of started twice.
 Only if the user EXPLICITLY requests a “quick read-only signup form check” use test_signup_page with quickReadOnlyOnly true. That mode does not create accounts or test the product. Fieldnotes demo requests use start_probe_demo. Synthetic mailbox aliases and encrypted account passwords stay on backend; never ask for or reveal credentials. No unrelated origins, external OAuth, purchases, invitations, public posts or destructive account/admin actions. Use actual evidence and disclose incomplete/blocked coverage.`,
         mcpServers: [{ name: 'probe-launcher', preload: true, enableTools: ['@all'], requireApprovalForTools: [] }],
@@ -150,7 +174,7 @@ Only if the user EXPLICITLY requests a “quick read-only signup form check” u
       }
       if (agentId) await forge.agents.update(agentId, { manifest, description: 'Start fresh local browser checks with Probe. Signup surface inspection and coordinated owner/editor demo testing.' });
       else { const { data } = await forge.agents.create({ name: 'probe', description: 'Start fresh local browser checks with Probe. Signup surface inspection and coordinated owner/editor demo testing.', manifest }); agentId = data.id; }
-      await repairArchivedConnectors();
+      await repairArchivedConnectors(onlySessionId);
       probeIntegration = { configured: true, agentId };
     } catch (error) { probeIntegration = { configured: false, reason: safeError(error) }; }
     return probeIntegration;

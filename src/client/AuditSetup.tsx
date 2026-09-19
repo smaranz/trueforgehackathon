@@ -21,13 +21,12 @@ interface AuditCatalog {
   mailbox?: { configured: boolean; address?: string; aliases?: boolean };
 }
 
-type LimitKey = 'agentCount' | 'concurrency' | 'maxStepsPerAgent' | 'deadlineMinutes' | 'maxTotalTokens';
+type LimitKey = 'agentCount' | 'concurrency' | 'maxStepsPerAgent' | 'deadlineMinutes';
 const LIMITS: { key: LimitKey; label: string; min: number; max: number; help: string }[] = [
   { key: 'agentCount', label: 'Specialist agents', min: 1, max: 30, help: '1–30 assignments from the catalog.' },
   { key: 'concurrency', label: 'Concurrent agents', min: 1, max: 6, help: '1–6 at once, up to your agent count.' },
   { key: 'maxStepsPerAgent', label: 'Steps per agent', min: 15, max: 100, help: '15–100 actual agent steps.' },
   { key: 'deadlineMinutes', label: 'Time limit · minutes', min: 5, max: 90, help: '5–90 minutes for the run.' },
-  { key: 'maxTotalTokens', label: 'Total token budget', min: 100_000, max: 6_000_000, help: '100,000–6,000,000 tokens across the run.' },
 ];
 
 async function readResponse(response: Response): Promise<unknown> {
@@ -72,7 +71,7 @@ function isRun(value: unknown): value is Run {
 
 export function AuditSetup({ onStarted, health }: AuditSetupProps) {
   const [goal, setGoal] = useState(DEFAULT_GOAL);
-  const [limits, setLimits] = useState<Record<LimitKey, string>>({ agentCount: '30', concurrency: '4', maxStepsPerAgent: '60', deadlineMinutes: '60', maxTotalTokens: '6000000' });
+  const [limits, setLimits] = useState<Record<LimitKey, string>>({ agentCount: '30', concurrency: '4', maxStepsPerAgent: '60', deadlineMinutes: '60' });
   const [catalog, setCatalog] = useState<AuditCatalog | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -141,7 +140,7 @@ export function AuditSetup({ onStarted, health }: AuditSetupProps) {
     setStartError(null);
     const input: AuditInput = {
       targetUrl: TARGET, goal: goal.trim(), agentCount, concurrency,
-      maxStepsPerAgent: Number(limits.maxStepsPerAgent), deadlineMinutes: Number(limits.deadlineMinutes), maxTotalTokens: Number(limits.maxTotalTokens),
+      maxStepsPerAgent: Number(limits.maxStepsPerAgent), deadlineMinutes: Number(limits.deadlineMinutes),
     };
     let accepted = false;
     try {
@@ -183,20 +182,21 @@ export function AuditSetup({ onStarted, health }: AuditSetupProps) {
 
         <section className="audit-section">
           <SectionTitle number="02" title="Set the boundaries"><SlidersHorizontal size={17} className="audit-muted" /></SectionTitle>
-          <fieldset className="audit-limits" disabled={starting}><legend className="sr-only">Agent, concurrency, step, time and token limits</legend>
-            {LIMITS.map(limit => <div className={`audit-field ${limit.key === 'maxTotalTokens' ? 'audit-field-wide' : ''}`} key={limit.key}>
+          <fieldset className="audit-limits" disabled={starting}><legend className="sr-only">Agent count, concurrency, browser steps and runtime</legend>
+            {LIMITS.map(limit => <div className="audit-field" key={limit.key}>
               <label htmlFor={`audit-${limit.key}`}>{limit.label}</label>
               <input id={`audit-${limit.key}`} name={limit.key} type="number" inputMode="numeric" min={limit.min} max={limit.key === 'concurrency' ? Math.min(6, previewCount || 6) : limit.max} step={1} required value={limits[limit.key]} onChange={event => changeLimit(limit.key, event.target.value)} aria-describedby={`audit-${limit.key}-help`} />
               <p className="audit-help" id={`audit-${limit.key}-help`}>{limit.help}</p>
             </div>)}
           </fieldset>
+          <div className="audit-inline-note"><Cpu size={16} /><p><strong>Unlimited token budget.</strong> Usage is tracked, but total token consumption will not stop queued agents or reproduction work.</p></div>
           <div className="audit-inline-note"><Clock size={16} /><p>These are execution ceilings. Agents act as tools return, with no arbitrary delays to fill the time limit. Concurrency limits how many agents run at once.</p></div>
         </section>
 
         <div className="audit-launch">
           {startError && <ErrorNotice>{startError}</ErrorNotice>}
-          <div className="audit-launch-row"><div><strong>Ready to meet your product?</strong><p>{validLimits ? `${agentCount} agents · ${Number(limits.deadlineMinutes)} min ceiling · ${Number(limits.maxTotalTokens).toLocaleString()} token budget` : 'Choose values within the execution limits.'}</p></div><button type="submit" className="button button-primary audit-start-button" disabled={!canStart}>{starting ? 'Starting audit…' : 'Start full-product audit'}<ArrowRight size={17} /></button></div>
-          <p className="audit-help" role="status">{starting ? 'Submitting the audit. Your workspace opens when the API returns the saved run.' : !ready ? 'Waiting for TrueForge readiness.' : catalogLoading ? 'Waiting for the assignment catalog.' : !validLimits ? 'Use whole numbers within each range; concurrency cannot exceed the agent count.' : goal.trim().length < 5 ? 'Add an investigation goal of at least 5 characters.' : 'Account creation is real. Time and tokens are limits, not a cost estimate.'}</p>
+          <div className="audit-launch-row"><div><strong>Ready to meet your product?</strong><p>{validLimits ? `${agentCount} agents · ${Number(limits.deadlineMinutes)} min ceiling · unlimited tokens` : 'Choose values within the execution limits.'}</p></div><button type="submit" className="button button-primary audit-start-button" disabled={!canStart}>{starting ? 'Starting audit…' : 'Start full-product audit'}<ArrowRight size={17} /></button></div>
+          <p className="audit-help" role="status">{starting ? 'Submitting the audit. Your workspace opens when the API returns the saved run.' : !ready ? 'Waiting for TrueForge readiness.' : catalogLoading ? 'Waiting for the assignment catalog.' : !validLimits ? 'Use whole numbers within each range; concurrency cannot exceed the agent count.' : goal.trim().length < 5 ? 'Add an investigation goal of at least 5 characters.' : 'Account creation is real. Token usage is measured without a spending cutoff.'}</p>
         </div>
 
         <section className="audit-section audit-catalog-section" aria-busy={catalogLoading}>

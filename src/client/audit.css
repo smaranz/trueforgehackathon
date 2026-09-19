@@ -167,8 +167,8 @@
 .audit-section-heading h2 { font-size: 20px; font-weight: 500; letter-spacing: -.035em; margin-top: 7px; line-height: 1.4; }
 .audit-section-heading p { font-size: 10px; color: var(--audit-muted); margin-top: 7px; }
 .audit-count { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; padding: 4px 7px; border: 1px solid #d9dfcf; border-radius: 4px; font-family: var(--mono, monospace); font-size: 9px; color: #647356; white-space: nowrap; }
-.audit-pool-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 22px; align-items: start; }
-.audit-pool-main { min-width: 0; }
+.audit-pool-layout { --audit-pool-height: clamp(480px, 78dvh, 760px); display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 22px; height: var(--audit-pool-height); align-items: stretch; }
+.audit-pool-main { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .audit-pool-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .audit-pool-filters .audit-field { margin: 0; }
 .audit-pool-filters .audit-field label { font-size: 9px; margin-bottom: 5px; }
@@ -176,7 +176,7 @@
 .audit-search { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-height: 40px; background: var(--audit-paper); border: 1px solid #c5ceba; border-radius: 5px; padding-inline: 12px; color: #718361; }
 .audit-search:focus-within { outline: 2px solid var(--audit-green); outline-offset: 3px; }
 .audit-search input { min-width: 0; width: 100%; border: 0; outline: none; background: transparent; padding-block: 10px; font-size: 11px; color: var(--audit-ink); }
-.audit-agent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; padding: 4px; margin: -4px; list-style: none; max-height: 624px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #bfccb1 transparent; overscroll-behavior: contain; }
+.audit-agent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 9px; min-height: 0; padding: 4px; margin: -4px; list-style: none; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #bfccb1 transparent; overscroll-behavior: contain; }
 .audit-agent-grid > li { min-width: 0; }
 .audit-agent-card { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; width: 100%; height: 100%; min-height: 167px; text-align: left; padding: 12px; background: var(--audit-paper); border: 1px solid #d8dfcf; border-radius: 6px; color: var(--audit-ink); }
 .audit-agent-card:hover { background: #f0f4e9; border-color: #a8bc97; }
@@ -200,8 +200,8 @@
 .audit-pool-legend { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--audit-muted); font-size: 8px; padding-top: 14px; }
 .audit-pool-legend > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
 .audit-legend-dot { width: 5px; height: 5px; border-radius: 50%; background: #789166; }
-.audit-inspector { min-width: 0; border: 1px solid #cbd7bf; border-radius: 7px; background: var(--audit-paper); overflow: hidden; scroll-margin-top: 18px; }
-.audit-inspector-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 19px 18px 14px; }
+.audit-inspector { min-width: 0; min-height: 0; height: 100%; border: 1px solid #cbd7bf; border-radius: 7px; background: var(--audit-paper); overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #bfccb1 transparent; scrollbar-gutter: stable; overscroll-behavior: contain; scroll-margin-top: 18px; }
+.audit-inspector-heading { position: sticky; top: 0; z-index: 1; background: var(--audit-paper); border-bottom: 1px solid var(--audit-line); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 19px 18px 14px; }
 .audit-inspector-heading > div { min-width: 0; }
 .audit-inspector-heading .audit-eyebrow { font-size: 8px; }
 .audit-inspector-heading h3 { font-size: 16px; font-weight: 500; letter-spacing: -.03em; margin-top: 8px; }
@@ -249,8 +249,9 @@
 .audit-coverage-notes { font-size: 10px; line-height: 1.8; color: #637056; padding-left: 16px; margin: 14px 0 0; }
 .audit-coverage-notes > li { margin-bottom: 7px; overflow-wrap: anywhere; }
 .audit-agent-findings { border-top: 1px solid #e0e5d8; padding-block: 15px 10px; }
-.audit-agent-findings > a { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--audit-green); line-height: 1.6; margin-top: 12px; }
-.audit-agent-findings > a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.audit-agent-finding { padding-top: 12px; }
+.audit-agent-finding > a { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--audit-green); line-height: 1.6; }
+.audit-agent-finding > a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .audit-inspector-empty { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 320px; padding: 30px; color: #6c8159; }
 .audit-inspector-empty h3 { font-size: 18px; margin-top: 23px; }
 .audit-inspector-empty p { color: var(--audit-muted); font-size: 11px; margin-top: 10px; max-width: 40ch; }
@@ -401,8 +402,10 @@
   .audit-assignment-inclusion, .audit-assignment .audit-viewport > span { display: inline; }
   .audit-run-heading { flex-direction: column; gap: 16px; }
   .audit-heading-actions { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; padding: 0; }
-  .audit-pool-layout { grid-template-columns: minmax(0, 1fr); gap: 22px; }
-  .audit-agent-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: 560px; }
+  .audit-pool-layout { grid-template-columns: minmax(0, 1fr); gap: 22px; height: auto; }
+  .audit-pool-main { height: var(--audit-pool-height); }
+  .audit-inspector { height: auto; max-height: min(760px, 85dvh); }
+  .audit-agent-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .audit-inspector-heading { flex-wrap: nowrap; }
   .audit-snapshot > .artifact-image { max-height: 340px; }
   .audit-report-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
@@ -532,7 +535,7 @@
   .audit-token-detail { font-size: 10px; text-align: left; }
   .audit-section-heading { align-items: flex-start; }
   .audit-section-heading .audit-count { margin-top: 26px; font-size: 8px; }
-  .audit-agent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 530px; }
+  .audit-agent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .audit-agent-card { padding: 11px; }
   .audit-inspector-heading { padding-inline: 15px; }
   .audit-inspector-body { padding-inline: 15px; }

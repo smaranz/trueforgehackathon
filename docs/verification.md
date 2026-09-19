@@ -2,7 +2,14 @@
 
 ## Full-product chat default verified
 
-- Current unit/boundary checks: **35 tests passed**, including signup-only completion prevention and cancellable provider-rate-limit backoff. Production build passed.
+- Unlimited-token deployment verified with a durable named `probe` session: `01m2xxw1t3ezsete605jpzs3gk`.
+- Actual tool execution started run `aa939959-789d-43a2-bb28-2dcbd1f7b64f` with30 assignments and `audit.maxTotalTokens: null`; it was running with four authenticated accounts when checked.
+- Desktop/mobile setup and run views both displayed **Unlimited token budget**, no budget input,30 agent cards and no page overflow.
+- The stale inline editor chat had reverted to a generic model with no instructions/tools. Its owned binding was repaired; repair now checks actual model/tool configuration instead of trusting only the stored version marker.
+- Evidence: `.data/acceptance/durable-probe-chat.json` and `.data/acceptance/unlimited-ui-check.json`.
+
+- Current unit/boundary checks: **37 tests passed**, including signup-only completion prevention, cancellable provider-rate-limit backoff and unlimited-token scheduling. Production build passed.
+- The real coordinator was exercised with controlled browser/model transports that reported90 million input tokens against a legacy one-token request limit. All three queued agents completed registration, exploration and recheck, and independent reproduction still ran. No paid model calls were made by this regression test; metrics remained recorded and the new run stored a null token limit.
 - Exact request sent in the previously problematic TrueForge session `01m2xmm5nh9t6kd51nkggmtqws`: **“Go and test this app: http://localhost:3000/signup with Probe.”**
 - The chat invoked the full audit and replied **“Running in Probe dashboard”** with the actual run URL, then completed while the audit continued in background.
 - Latest new run: `99ee31c0-a906-4338-8238-91980afa369e`, **30 assignments**, four concurrent workers, six-million-token ceiling. No signup-surface run was created by that prompt. The chat returned while the run was actually running.

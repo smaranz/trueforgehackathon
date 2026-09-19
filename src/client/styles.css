@@ -141,6 +141,14 @@ time, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .button-secondary { background: var(--surface); border-color: #d5d8cc; }
 .button-secondary:hover:not(:disabled) { background: var(--green-soft); border-color: #bbc8b2; color: var(--green); }
 .button-small { min-height: 35px; padding: 8px 12px; font-size: 11px; }
+.copy-fix-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.copy-fix-prompt > .button { white-space: nowrap; }
+.finding-card-link { display: block; }
+.finding-card-actions { margin-top: 15px; padding-top: 2px; border-top: 1px solid var(--line); }
+.finding-detail-actions { margin: 18px 0 25px; }
+.copy-fix-fallback { flex-basis: 100%; min-width: 0; }
+.copy-fix-fallback p { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.copy-fix-fallback textarea { width: 100%; border: 1px solid var(--line); padding: 10px; border-radius: 4px; background: var(--surface); font-size: 12px; line-height: 1.6; resize: vertical; }
 .text-button { border: 0; padding: 2px 0; background: transparent; color: var(--green); display: inline-flex; justify-content: center; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; line-height: 1.6; }
 .text-button:hover:not(:disabled) { color: #234a2c; text-decoration: underline; text-underline-offset: 4px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 17px; }
@@ -379,7 +387,7 @@ input::placeholder, textarea::placeholder { color: #6c7662; opacity: 1; }
 .finding-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .finding-card-top .eyebrow { font-size: 8px; }
 .finding-card h3 { margin-top: 16px; font-size: 14px; overflow-wrap: anywhere; }
-.finding-card > p { margin-top: 8px; font-size: 11px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.finding-card .finding-card-link > p { margin-top: 8px; font-size: 11px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .finding-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 20px; color: var(--green); }
 .run-context { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
 .run-context > .eyebrow { font-size: 9px; }
@@ -609,7 +617,7 @@ a.artifact-link:hover { text-decoration: underline; text-underline-offset: 3px; 
   .finding-heading { margin-top: 25px; }
   .finding-heading h1 { font-size: 29px; }
   .finding-card h3 { font-size: 15px; }
-  .finding-card > p { font-size: 12px; }
+  .finding-card .finding-card-link > p { font-size: 12px; }
   .notice { flex-wrap: wrap; padding: 12px; }
   .notice > span { min-width: 180px; }
   .notice > button { margin-left: 28px; }

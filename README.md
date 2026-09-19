@@ -63,6 +63,10 @@ Signup submits the real UI form and requires server authentication evidence from
 
 ## Results and limits
 
+**Total token budget: unlimited.** Probe records usage but no longer stops queued agents, recheck passes or reproductions based on token consumption. The token-budget input has been removed. Provider rate limits use backoff; browser-step and runtime limits remain distinct controls. Historical reports still show the limits under which those earlier runs stopped.
+
+Use the **saved `probe` agent** (a named/reference session) for durable chat tools. A stale generic inline chat can overwrite its model/tool configuration in the TrueForge composer. Locally owned archived sessions can be repaired through `/api/probe/connect`; the named agent binding is the preferred entrypoint. Verified chat: [Probe — full-product audit](http://127.0.0.1:8790/sessions/01m2xxw1t3ezsete605jpzs3gk).
+
 ### Chat → dashboard behavior
 
 Send **“Go and test this app: http://localhost:3000/signup with Probe”** to the saved `probe` agent or the repaired earlier owner/editor chat. The default is a **30-agent full-product audit**, not a signup form check. TrueForge starts background workers, returns **“Running in Probe dashboard”** with the actual saved run URL, and ends the chat turn while testing continues.
